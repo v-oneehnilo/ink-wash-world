@@ -280,6 +280,26 @@ function setStyle(value){
 }
 for(const button of document.querySelectorAll('[data-paint]'))button.addEventListener('click',()=>setStyle(Number(button.dataset.paint)));
 function setDrawer(open){$('console').hidden=!open;$('show').hidden=open;$('show').setAttribute('aria-expanded',String(open));(open?$('hide'):$('show')).focus();}
+const panelTabs=[...document.querySelectorAll('[data-tab]')];
+function setPanel(name,focus=false){
+ const selected=panelTabs.find(tab=>tab.dataset.tab===name);
+ if(!selected)return;
+ for(const tab of panelTabs){const active=tab===selected;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;$(tab.getAttribute('aria-controls')).hidden=!active;}
+ document.querySelector('.panel-body').scrollTop=0;
+ if(focus)selected.focus();
+}
+panelTabs.forEach((tab,index)=>{
+ tab.addEventListener('click',()=>setPanel(tab.dataset.tab));
+ tab.addEventListener('keydown',event=>{
+  let next=index;
+  if(event.key==='ArrowRight')next=(index+1)%panelTabs.length;
+  else if(event.key==='ArrowLeft')next=(index+panelTabs.length-1)%panelTabs.length;
+  else if(event.key==='Home')next=0;
+  else if(event.key==='End')next=panelTabs.length-1;
+  else return;
+  event.preventDefault();event.stopPropagation();setPanel(panelTabs[next].dataset.tab,true);
+ });
+});
 addEventListener('keydown',event=>{if(event.code==='Escape'&&!$('console').hidden)setDrawer(false);});
 function updateUI(){const direction=state.manual||(state.auto?1:0);$('auto').setAttribute('aria-pressed',String(state.auto));$('auto-text').textContent=state.auto?'暂停游览':'自动前进';$('auto-symbol').textContent=state.auto?'Ⅱ':'▷';$('status').textContent=direction<0?'归舟回望':direction>0?'行舟山水':'静观山水';$('distance').textContent=Math.floor(state.position);$('back').disabled=state.position<=0;$('speed-value').textContent=state.speed.toFixed(2)+'×';$('forward').classList.toggle('active',state.manual===1);$('back').classList.toggle('active',state.manual===-1);}
 function stop(){state.manual=0;updateUI();}function toggleAuto(){state.manual=0;state.auto=!state.auto;updateUI();}

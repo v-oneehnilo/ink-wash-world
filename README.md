@@ -14,14 +14,15 @@ Open http://127.0.0.1:4173. A browser with WebGL and hardware acceleration is re
 
 ## Controls
 
-- Enter a text or numeric seed and select **生成山水** to generate a world.
+- The left console has three keyboard-accessible tabs: **游览** (movement and camera), **画面** (painting style and seed), and **点景** (optional scenery). Left/right arrow keys, Home and End navigate the tab list. Switching tabs preserves every scene setting.
+- In **画面**, enter a text or numeric seed and select **生成** to generate a world.
 - Hold **前进 / 后退**, or the up/down arrow keys, to move.
 - Toggle **自动前进**, or press Space outside a form control, to cruise.
 - Adjust speed from 0.25× to 3×.
 - Adjust **观察高度** from 3 to 80 scene meters and **上下视角** from 55° down to 30° up. **恢复默认视角** restores 16 meters / 8° down without changing the seed, journey, features, or cruise state.
 - Select **回到起点** to return to the beginning with the same seed.
 - Choose **宋画水墨 / 宣纸写意 / 青绿山水 / 雨雾实景** in the left-side drawer. Switching style keeps the current seed, position, speed, and cruise state.
-- Expand **景致与生趣** to independently add or remove pines, boats, pavilions, birds, drifting mist, water ripples, and alternating narrow/wide river sections. **纯山水** disables all seven additions; **全部加入** enables them. These switches preserve the journey and painting style.
+- In **点景**, independently add or remove pines, boats, pavilions, birds, drifting mist, water ripples, and alternating narrow/wide river sections. **纯山水** disables all seven additions; **全部加入** enables them. These switches preserve the journey and painting style.
 - Close the drawer with its **×** button or Escape. Use the left-edge **操控台** handle to reopen it. On smaller screens, the drawer scrolls independently.
 
 Moving manually cancels cruise. Leaving the page pauses movement. Backtracking preserves the same landscape; generation depends on the seed and world coordinates, not elapsed time. Distance is a virtual scene measure. Very long journeys may eventually encounter GPU floating-point precision limits.
@@ -44,6 +45,10 @@ Birds, mist, and ripples animate gently even while the viewer is stationary. Tho
 - `dist/style.css`: responsive layout
 - `dist/app.js`: renderer, deterministic terrain, and input handling
 - `dist/solids.js`: volumetric boat and pavilion geometry, materials, and ray intersections
+- `dist/fonts/`: self-hosted UI/display font subsets and their SIL Open Font License notices
+- `scripts/build-fonts.py`: optional font-subset build helper (requires fonttools and brotli)
 - `server.mjs`: local development server
 
 The site can be served by any static web host. Sites deployment configuration lives in `.openai/hosting.json`.
+
+The UI uses an OFL-licensed Noto Sans SC subset for stable Chinese typography, with a small Noto Serif SC subset for the wordmark. Font files are served locally; no third-party font requests are made at runtime. Uncommon characters typed into the seed field fall back to the user's system fonts. The build helper subsets text from `index.html` and `app.js`; regenerate the subsets when adding new visible Chinese text. Example: `python scripts/build-fonts.py /path/to/source-fonts`.
