@@ -1,32 +1,156 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const state={seed:'山水无限',position:0,speed:1,auto:false,manual:0};
+const state={seed:'山水无限',position:0,speed:1,auto:false,manual:0,style:0};
 function hashSeed(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0)%10000;}
 const vertex=`attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+// All rock and brush coordinates belong to the world, so strokes do not swim
+// across the screen while travelling. Style changes never alter the terrain.
 const fragment=`precision highp float;
-uniform vec2 resolution;uniform float position;uniform float seed;
+uniform vec2 resolution;
+uniform float position,seed,style;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+seed)*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
-float fbm(vec2 p){float f=0.;f+=.55*noise(p);p=p*2.03+19.;f+=.26*noise(p);p=p*2.01+7.;f+=.13*noise(p);p=p*2.02;f+=.06*noise(p);return f;}
-float river(float z){return sin(z*.008+seed*.01)*10.+sin(z*.021)*3.;}
-float height(vec2 p){float bank=abs(p.x-river(p.y));float n=fbm(p*.021);float hills=pow(n,1.9)*118.+5.;return hills*smoothstep(10.,46.,bank)-1.9;}
-vec3 sky(vec3 rd){return mix(vec3(.77,.84,.82),vec3(.94,.95,.89),clamp(rd.y*1.2+.35,0.,1.));}
-vec3 landColor(vec3 p,float t){float e=.6;vec3 normal=normalize(vec3(height(p.xz-vec2(e,0))-height(p.xz+vec2(e,0)),2.*e,height(p.xz-vec2(0,e))-height(p.xz+vec2(0,e))));float light=dot(normal,normalize(vec3(-.7,.8,-.4)))*.5+.5;float strata=noise(vec2(p.x*.9+p.y*.13,p.z*.2));vec3 ink=mix(vec3(.10,.22,.23),vec3(.36,.47,.43),light);ink*=.85+.15*strata;float mist=1.-exp(-t*.008-p.y*.0005);return mix(ink,vec3(.78,.84,.80),clamp(mist,0.,.98));}
-vec3 trace(vec3 ro,vec3 rd){float t=0.;for(int i=0;i<110;i++){vec3 p=ro+rd*t;float d=p.y-height(p.xz);if(d<.08){return landColor(p,t);}t+=max(.3,d*.36);if(t>500.)break;}return sky(rd);}
-void main(){vec2 uv=(gl_FragCoord.xy*2.-resolution)/resolution.y;vec3 ro=vec3(river(position),4.6,position);vec3 rd=normalize(vec3(uv.x,uv.y*.8-.035,1.3));vec3 col;
-if(rd.y<0.){float wt=-ro.y/rd.y;float t=0.;bool hit=false;vec3 p=ro;for(int i=0;i<95;i++){p=ro+rd*t;float d=p.y-height(p.xz);if(d<.08){hit=true;break;}t+=max(.25,d*.36);if(t>min(wt,500.))break;}
-if(hit){col=landColor(p,t);}else if(wt<500.){vec3 water=ro+rd*wt;vec3 reflectDir=vec3(rd.x,-rd.y,rd.z);reflectDir.x+=.008*sin(water.z*1.9+water.x*.7);col=trace(water+vec3(0,.12,0),reflectDir);float ripple=sin(water.z*7.+sin(water.x*.8))*sin(water.z*2.+water.x*.2);float fresnel=pow(1.-abs(rd.y),3.);col=mix(vec3(.27,.43,.42),col,.40+.35*fresnel);col+=ripple*.015*exp(-wt*.004);col=mix(col,vec3(.78,.84,.80),1.-exp(-wt*.006));}else{col=sky(rd);}}
-else{col=trace(ro,rd);}float grain=(hash(gl_FragCoord.xy)-.5)*.018;col+=grain;gl_FragColor=vec4(col,1.);}`;
+float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+19.)+.15*noise(p*4.11+7.);}
+float river(float z){return sin(z*.007+seed*.01)*11.+sin(z*.017)*4.;}
+float height(vec2 p){
+ float bank=abs(p.x-river(p.y));
+ float broad=fbm(p*.019);
+ float ridge=1.-abs(2.*noise(p*.023)-1.);
+ float shoulder=noise(p*.048+13.);
+ float mass=pow(broad,2.5)*180.+pow(ridge,3.)*9.;
+ float folds=shoulder*1.7+noise(p*.12)*.7;
+ return (mass+folds)*smoothstep(14.,49.,bank)-2.;
+}
+vec3 paper(){if(style>2.5)return vec3(.84,.88,.85);if(style>1.5)return vec3(.94,.925,.85);if(style>.5)return vec3(.957,.948,.912);return vec3(.937,.927,.871);}
+vec3 sky(vec3 rd){vec3 c=paper();if(style>2.5)c=mix(c,vec3(.72,.81,.82),clamp(rd.y*.75,0.,.6));return c;}
+float marchTerrain(vec3 ro,vec3 rd,float limit){
+ float t=.1,previous=0.;
+ for(int i=0;i<160;i++){
+  vec3 p=ro+rd*t;float gap=p.y-height(p.xz);
+  if(gap<.025){
+   float lo=previous,hi=t;
+   for(int j=0;j<5;j++){float mid=(lo+hi)*.5;vec3 q=ro+rd*mid;if(q.y<height(q.xz))hi=mid;else lo=mid;}
+   return (lo+hi)*.5;
+  }
+  previous=t;t+=max(.09,gap*.30);
+  if(t>limit)return -1.;
+ }
+ // Grazing rays may exhaust the step budget just above a ridge. Keep the
+ // nearby surface instead of punching bright sky-shaped holes through it.
+ vec3 endPoint=ro+rd*t;
+ return t<limit&&endPoint.y-height(endPoint.xz)<1.5?t:-1.;
+}
+vec3 mountain(vec3 p,vec3 rd,float t){
+ float e=.22;
+ float h=height(p.xz);
+ vec3 normal=normalize(vec3(height(p.xz-vec2(e,0))-height(p.xz+vec2(e,0)),2.*e,height(p.xz-vec2(0,e))-height(p.xz+vec2(0,e))));
+ float light=clamp(dot(normal,normalize(vec3(-.7,.75,-.45)))*.5+.5,0.,1.);
+ float face=1.-abs(dot(normal,-rd));
+ // Long, irregular rock fibres, short broken strokes, and pooled ink.
+ vec2 rock=vec2(p.x*.73+p.z*.57,p.y*.75);
+ float warp=fbm(rock*.8)*5.;
+ float fibre=noise(vec2(rock.x*7.+warp+rock.y*.5,rock.y*1.1));
+ float split=smoothstep(.60,.80,fibre);
+ float stroke=split*smoothstep(.33,.63,noise(vec2(rock.x*2.5,rock.y*7.)));
+ float wash=fbm(vec2(p.x*.15+p.z*.09,p.y*.18));
+ float grain=noise(vec2(p.x*15.+p.z*7.,p.y*17.));
+ float detail=1.-smoothstep(100.,300.,t);
+ float rim=pow(face,5.)*.17;
+ float density=.26+(1.-light)*.46+wash*.29+stroke*.19*detail+rim;
+ vec3 ink=vec3(.15,.205,.185);
+ vec3 color;
+ if(style<.5){
+  density+=smoothstep(.74,.86,fibre)*.08*detail;
+  density-=smoothstep(.66,.85,grain)*.045*detail;
+  color=mix(paper(),ink,clamp(density,0.,.94));
+ }else if(style<1.5){
+  float wet=noise(rock*.27);
+  density=.22+floor((1.-light+wash*.65)*4.)*.15+wet*.16;
+  density+=stroke*.16*detail;
+  density-=smoothstep(.57,.77,grain)*.10*detail;
+  color=mix(paper(),vec3(.14,.17,.165),clamp(density,0.,.92));
+ }else if(style<2.5){
+  vec3 ochre=vec3(.56,.42,.22),azurite=vec3(.11,.36,.43),malachite=vec3(.17,.43,.29);
+  float strata=noise(p.xz*.026+vec2(p.y*.038));
+  vec3 mineral=mix(ochre,mix(azurite,malachite,smoothstep(.35,.75,strata)),smoothstep(2.,21.,p.y));
+  color=mineral*(.67+light*.51);
+  color=mix(color,vec3(.14,.24,.20),(stroke*.34+rim)*detail);
+  color+=(grain-.5)*.07*detail;
+ }else{
+  float vegetation=smoothstep(.39,.63,noise(p.xz*.42))*smoothstep(.35,.75,normal.y);
+  color=mix(vec3(.38,.40,.34),vec3(.19,.30,.24),vegetation);
+  color*=.5+light*.65;color-=stroke*.035*detail;
+ }
+ float fog=1.-exp(-t*(style>2.5?.0068:.0048));
+ float cloud=(1.-smoothstep(5.,22.,p.y))*(.3+.7*noise(p.xz*.015+15.))*smoothstep(40.,190.,t);
+ fog=clamp(fog+cloud*.23,0.,.96);
+ return mix(color,paper(),fog);
+}
+vec3 water(vec3 ro,vec3 rd,float t){
+ vec3 p=ro+rd*t;vec3 base=paper();
+ float bank=abs(p.x-river(p.z));
+ float wake=noise(vec2(p.x*.12,p.z*1.1));
+ float lines=smoothstep(.975,.998,sin(p.z*2.3+noise(vec2(p.x*.16,p.z*.09))*5.));
+ float broken=smoothstep(.56,.74,noise(vec2(p.x*.32,p.z*.7)));
+ float fade=exp(-t*.012);
+ if(style<1.5){
+  base-=vec3(.10,.095,.072)*smoothstep(8.,24.,bank)*.24;
+  base-=vec3(.20,.23,.19)*lines*broken*fade*(style>.5?.27:.38);
+ }else if(style<2.5){
+  base=mix(base,vec3(.59,.72,.64),.23*fade);
+  base-=vec3(.18,.24,.19)*lines*broken*fade*.35;
+ }else{
+  vec3 rr=vec3(rd.x,-rd.y,rd.z);rr.x+=sin(p.z*1.7+p.x*.7)*.009;
+  float hit=marchTerrain(p+vec3(0,.12,0),rr,330.);
+  vec3 reflection=hit>0.?mountain(p+vec3(0,.12,0)+rr*hit,rr,hit):sky(rr);
+  base=mix(vec3(.34,.47,.45),reflection,.62);
+  base+=(wake-.5)*.025;
+  base=mix(base,paper(),1.-exp(-t*.009));
+ }
+ return base;
+}
+void main(){
+ vec2 uv=(gl_FragCoord.xy*2.-resolution)/resolution.y;
+ vec3 ro=vec3(river(position),8.,position);
+ vec3 rd=normalize(vec3(uv.x,uv.y*.83-.035,1.35));
+ float wt=rd.y<-.001?-ro.y/rd.y:650.;
+ float t=marchTerrain(ro,rd,min(wt,650.));
+ vec3 col=t>0.?mountain(ro+rd*t,rd,t):(wt<650.?water(ro,rd,wt):sky(rd));
+ // Subtle fixed paper fibres, never animated film noise.
+ float fibre=noise(gl_FragCoord.xy*vec2(.7,.45));
+ float dust=hash(gl_FragCoord.xy);
+ float strength=style>2.5?.002:style>1.5?.009:.010;
+ col+=(fibre-.5)*strength+(dust-.5)*strength*.65;
+ gl_FragColor=vec4(col,1.);
+}`;
 const canvas=$('landscape');const gl=canvas.getContext('webgl',{alpha:false,antialias:false,powerPreference:'high-performance'});let program,uniforms,failed=false;
 function fail(error){failed=true;$('error').hidden=false;for(const el of document.querySelectorAll('.console button,.console input'))el.disabled=true;console.error(error);}
-if(!gl)fail('WebGL unavailable');else try{function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const a=gl.getAttribLocation(program,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);uniforms={resolution:gl.getUniformLocation(program,'resolution'),position:gl.getUniformLocation(program,'position'),seed:gl.getUniformLocation(program,'seed')};}catch(e){fail(e);}
+if(!gl)fail('WebGL unavailable');else try{function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const a=gl.getAttribLocation(program,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);uniforms={resolution:gl.getUniformLocation(program,'resolution'),position:gl.getUniformLocation(program,'position'),seed:gl.getUniformLocation(program,'seed'),style:gl.getUniformLocation(program,'style')};}catch(e){fail(e);}
 let dirty=true;function resize(){const scale=Math.min(1,1100/innerWidth,750/innerHeight);canvas.width=Math.round(innerWidth*scale);canvas.height=Math.round(innerHeight*scale);dirty=true;}addEventListener('resize',resize);resize();
+const paintStyles=[
+ {name:'宋画水墨',note:'淡设色，细皴笔。近山有骨，远山入烟。'},
+ {name:'宣纸写意',note:'干笔断续，浓淡积染。以留白写江水。'},
+ {name:'青绿山水',note:'石青石绿，赭石为底。层叠山色如矿物颜料。'},
+ {name:'雨雾实景',note:'湿润岩壁，水光倒影。沿雾中的山峡徐行。'}
+];
+function setStyle(value){
+ if(!Number.isInteger(value)||value<0||value>=paintStyles.length)throw Error('无效画风');
+ state.style=value;document.body.dataset.style=String(value);
+ for(const button of document.querySelectorAll('[data-paint]'))button.setAttribute('aria-pressed',String(Number(button.dataset.paint)===value));
+ $('style-note').textContent=paintStyles[value].note;$('style-label').textContent=paintStyles[value].name;
+ $('announce').textContent='已切换为'+paintStyles[value].name;dirty=true;
+}
+for(const button of document.querySelectorAll('[data-paint]'))button.addEventListener('click',()=>setStyle(Number(button.dataset.paint)));
+function setDrawer(open){$('console').hidden=!open;$('show').hidden=open;$('show').setAttribute('aria-expanded',String(open));(open?$('hide'):$('show')).focus();}
+addEventListener('keydown',event=>{if(event.code==='Escape'&&!$('console').hidden)setDrawer(false);});
 function updateUI(){const direction=state.manual||(state.auto?1:0);$('auto').setAttribute('aria-pressed',String(state.auto));$('auto-text').textContent=state.auto?'暂停游览':'自动前进';$('auto-symbol').textContent=state.auto?'Ⅱ':'▷';$('status').textContent=direction<0?'归舟回望':direction>0?'行舟山水':'静观山水';$('distance').textContent=Math.floor(state.position);$('back').disabled=state.position<=0;$('speed-value').textContent=state.speed.toFixed(2)+'×';$('forward').classList.toggle('active',state.manual===1);$('back').classList.toggle('active',state.manual===-1);}
 function stop(){state.manual=0;updateUI();}function toggleAuto(){state.manual=0;state.auto=!state.auto;updateUI();}
 function generate(value){if(typeof value!=='string'||!value.trim()||value.length>64)throw Error('请输入 1–64 个字符的种子');state.seed=value.trim();state.position=0;state.auto=false;state.manual=0;$('seed').value=state.seed;dirty=true;updateUI();$('announce').textContent='新的山水已生成';}
 $('seed-form').addEventListener('submit',e=>{e.preventDefault();if(!$('seed').value.trim()){$('seed').setCustomValidity('请输入数字或文字');$('seed').reportValidity();return;}generate($('seed').value);});$('seed').addEventListener('input',()=>$('seed').setCustomValidity(''));
 for(const [id,dir] of [['forward',1],['back',-1]]){const b=$(id);b.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();b.setPointerCapture(e.pointerId);state.auto=false;state.manual=dir;updateUI();});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,stop);b.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();state.auto=false;state.manual=dir;updateUI();}});b.addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();stop();}});b.addEventListener('blur',stop);}
-$('auto').addEventListener('click',toggleAuto);$('speed').addEventListener('input',()=>{state.speed=Number($('speed').value);updateUI();});$('reset').addEventListener('click',()=>{state.position=0;state.auto=false;state.manual=0;dirty=true;updateUI();});$('hide').addEventListener('click',()=>{$('console').hidden=true;$('show').hidden=false;$('show').focus();});$('show').addEventListener('click',()=>{$('console').hidden=false;$('show').hidden=true;$('hide').focus();});
+$('auto').addEventListener('click',toggleAuto);$('speed').addEventListener('input',()=>{state.speed=Number($('speed').value);updateUI();});$('reset').addEventListener('click',()=>{state.position=0;state.auto=false;state.manual=0;dirty=true;updateUI();});$('hide').addEventListener('click',()=>setDrawer(false));$('show').addEventListener('click',()=>setDrawer(true));
 addEventListener('keydown',e=>{if(/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName))return;if(['ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)toggleAuto();if(e.code==='ArrowUp'||e.code==='ArrowDown'){state.auto=false;state.manual=e.code==='ArrowUp'?1:-1;updateUI();}});addEventListener('keyup',e=>{if(e.code==='ArrowUp'||e.code==='ArrowDown')stop();});addEventListener('blur',()=>{state.manual=0;state.auto=false;updateUI();});document.addEventListener('visibilitychange',()=>{if(document.hidden){state.manual=0;state.auto=false;updateUI();}});canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();state.auto=false;fail('画面连接中断，请刷新页面');});
-let last=0;function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;if(!failed){const direction=state.manual||(state.auto?1:0);if(direction){state.position=Math.max(0,state.position+direction*state.speed*7*dt);if(state.position===0&&state.manual<0)state.manual=0;dirty=true;updateUI();}if(dirty){gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1f(uniforms.position,state.position);gl.uniform1f(uniforms.seed,hashSeed(state.seed));gl.drawArrays(gl.TRIANGLES,0,6);dirty=false;}}requestAnimationFrame(frame);}updateUI();requestAnimationFrame(frame);
-if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'configure_shanshui_journey',description:'设置山水种子或游览速度，开始或暂停自动前进。更换种子会回到起点。',inputSchema:{type:'object',properties:{seed:{type:'string',minLength:1,maxLength:64},speed:{type:'number',minimum:.25,maximum:3},auto:{type:'boolean'}},additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).some(k=>!['seed','speed','auto'].includes(k)))throw Error('无效参数');if(input.seed!==undefined&&(typeof input.seed!=='string'||!input.seed.trim()||input.seed.length>64))throw Error('无效种子');if(input.speed!==undefined&&(typeof input.speed!=='number'||!Number.isFinite(input.speed)||input.speed<.25||input.speed>3))throw Error('无效速度');if(input.auto!==undefined&&typeof input.auto!=='boolean')throw Error('无效自动前进设置');if(input.seed!==undefined)generate(input.seed);if(input.speed!==undefined){state.speed=input.speed;$('speed').value=String(input.speed);}if(input.auto!==undefined){state.auto=input.auto;state.manual=0;}updateUI();return {...state};}})).catch(console.warn);}catch(e){console.warn(e);}}
+let last=0;function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;if(!failed){const direction=state.manual||(state.auto?1:0);if(direction){state.position=Math.max(0,state.position+direction*state.speed*7*dt);if(state.position===0&&state.manual<0)state.manual=0;dirty=true;updateUI();}if(dirty){gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1f(uniforms.position,state.position);gl.uniform1f(uniforms.seed,hashSeed(state.seed));gl.uniform1f(uniforms.style,state.style);gl.drawArrays(gl.TRIANGLES,0,6);dirty=false;}}requestAnimationFrame(frame);}updateUI();requestAnimationFrame(frame);
+if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'configure_shanshui_journey',description:'设置画风、山水种子或游览速度，开始或暂停自动前进。更换种子回到起点；切换画风保留位置。',inputSchema:{type:'object',properties:{style:{type:'integer',minimum:0,maximum:3,description:'0 宋画水墨，1 宣纸写意，2 青绿山水，3 雨雾实景'},seed:{type:'string',minLength:1,maxLength:64},speed:{type:'number',minimum:.25,maximum:3},auto:{type:'boolean'}},additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).some(k=>!['seed','speed','auto','style'].includes(k)))throw Error('无效参数');if(input.style!==undefined&&(!Number.isInteger(input.style)||input.style<0||input.style>3))throw Error('无效画风');if(input.seed!==undefined&&(typeof input.seed!=='string'||!input.seed.trim()||input.seed.length>64))throw Error('无效种子');if(input.speed!==undefined&&(typeof input.speed!=='number'||!Number.isFinite(input.speed)||input.speed<.25||input.speed>3))throw Error('无效速度');if(input.auto!==undefined&&typeof input.auto!=='boolean')throw Error('无效自动前进设置');if(input.style!==undefined)setStyle(input.style);if(input.seed!==undefined)generate(input.seed);if(input.speed!==undefined){state.speed=input.speed;$('speed').value=String(input.speed);}if(input.auto!==undefined){state.auto=input.auto;state.manual=0;}updateUI();return {...state};}})).catch(console.warn);}catch(e){console.warn(e);}}
+
+
