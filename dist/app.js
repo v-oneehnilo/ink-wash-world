@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const state={seed:'山水无限',position:0,speed:1,auto:false,manual:0,style:0};
+const state={seed:'山水无限',position:0,speed:1,auto:false,manual:0,style:0,cameraHeight:16,pitch:-8};
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const features={pine:true,boat:true,pavilion:true,birds:!reducedMotion,fog:!reducedMotion,ripples:!reducedMotion,openings:true};
 function hashSeed(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0)%10000;}
@@ -11,6 +11,7 @@ const fragment=`precision highp float;
 uniform vec2 resolution;
 uniform float position,seed,style;
 uniform float elapsed;
+uniform vec2 camera;
 uniform vec4 landmarks;
 uniform vec3 atmosphere;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+seed)*43758.5453);}
@@ -18,7 +19,7 @@ float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(ha
 float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+19.)+.15*noise(p*4.11+7.);}
 float river(float z){return sin(z*.007+seed*.01)*11.+sin(z*.017)*4.;}
 float riverWidth(float z){float opening=pow(.5-.5*cos(z*.015+seed*.0001),2.);return mix(14.,12.+opening*27.,atmosphere.z);}
-float height(vec2 p){
+float rawHeight(vec2 p){
  float bank=abs(p.x-river(p.y));
  float broad=fbm(p*.019);
  float ridge=1.-abs(2.*noise(p*.023)-1.);
@@ -27,6 +28,24 @@ float height(vec2 p){
  float folds=shoulder*1.7+noise(p*.12)*.7;
  float shore=riverWidth(p.y);
  return (mass+folds)*smoothstep(shore,shore+35.,bank)-2.;
+}
+vec3 pavilionAnchor(float id){
+ float z=id*180.+132.;float side=mod(id,2.)<1.?1.:-1.;
+ float x=river(z)-side*(riverWidth(z)+10.);
+ return vec3(x,max(.45,rawHeight(vec2(x,z))),z);
+}
+float height(vec2 p){
+ float natural=rawHeight(p);
+ if(landmarks.z<.5)return natural;
+ float id=floor((p.y-132.)/180.+.5);
+ if(id<0.)return natural;
+ if(abs(p.y-(id*180.+132.))>10.5)return natural;
+ // A level terrace covers the entire foundation and rotated roof footprint,
+ // not just the anchor point. Smooth earthwork joins it to the hillside.
+ vec3 site=pavilionAnchor(id);
+ float radius=max(abs(p.x-site.x),abs(p.y-site.z));
+ float blend=1.-smoothstep(6.6,10.5,radius);
+ return mix(natural,site.y,blend);
 }
 vec3 paper(){if(style>2.5)return vec3(.84,.88,.85);if(style>1.5)return vec3(.94,.925,.85);if(style>.5)return vec3(.957,.948,.912);return vec3(.937,.927,.871);}
 vec3 sky(vec3 rd){vec3 c=paper();if(style>2.5)c=mix(c,vec3(.72,.81,.82),clamp(rd.y*.75,0.,.6));return c;}
@@ -39,7 +58,7 @@ float marchTerrain(vec3 ro,vec3 rd,float limit){
    for(int j=0;j<5;j++){float mid=(lo+hi)*.5;vec3 q=ro+rd*mid;if(q.y<height(q.xz))hi=mid;else lo=mid;}
    return (lo+hi)*.5;
   }
-  previous=t;t+=max(.09,gap*.30);
+  previous=t;t+=max(.07,gap*.24);
   if(t>limit)return -1.;
  }
  // Grazing rays may exhaust the step budget just above a ridge. Keep the
@@ -117,8 +136,8 @@ vec3 water(vec3 ro,vec3 rd,float t){
  }
  return base;
 }
-// Sparse, world-anchored silhouettes. Each billboard is depth-tested against
-// the terrain, so a mountain can reveal or hide its landmarks as we travel.
+// Fine pine and bird ink marks retain their illustration treatment. Boats
+// and pavilions below use full 3D geometry instead of these silhouettes.
 float segment(vec2 p,vec2 a,vec2 b){vec2 ab=b-a;return length(p-a-ab*clamp(dot(p-a,ab)/dot(ab,ab),0.,1.));}
 float oval(vec2 p,vec2 c,vec2 r){return (length((p-c)/r)-1.)*min(r.x,r.y);}
 float pineShape(vec2 q){
@@ -135,22 +154,6 @@ float pineShape(vec2 q){
  leaf+=(noise(q*14.)-.5)*.18;
  return min(d,leaf);
 }
-float boatShape(vec2 q){
- float hull=max(abs(q.x)-2.45,max(q.y-.12,-q.y-.36+pow(abs(q.x)/2.5,3.)*.30));
- float cabin=max(oval(q,vec2(-.5,.20),vec2(1.05,.78)),.20-q.y);
- float person=min(length(q-vec2(1.,1.1))-.15,segment(q,vec2(1.,.92),vec2(.9,.23))-.10);
- float pole=segment(q,vec2(.95,.65),vec2(2.2,2.2))-.035;
- return min(min(hull,cabin),min(person,pole));
-}
-float pavilionShape(vec2 q){
- float roofTop=3.25-abs(q.x)*.53+pow(abs(q.x)/2.05,5.)*.38;
- float roofBottom=2.25+pow(abs(q.x)/2.05,4.)*.30;
- float roof=max(abs(q.x)-2.05,max(q.y-roofTop,roofBottom-q.y));
- float pillars=min(segment(q,vec2(-1.2,.2),vec2(-1.2,2.4)),segment(q,vec2(1.2,.2),vec2(1.2,2.4)))-.075;
- float floorShape=max(abs(q.x)-1.55,abs(q.y-.12)-.10);
- float rail=segment(q,vec2(-1.25,.65),vec2(1.25,.65))-.045;
- return min(min(roof,pillars),min(floorShape,rail));
-}
 float birdShape(vec2 q,float phase){
  float wing=sin(phase)*.30;
  float left=segment(q,vec2(0,0),vec2(-.40,.12+wing));
@@ -164,7 +167,7 @@ void paintObject(inout vec3 color,inout float depth,vec3 ro,vec3 rd,vec3 anchor,
  if(t<1.||t>=depth)return;
  vec2 q=(ro.xy+rd.xy*t-anchor.xy)/size;q.x*=flip;
  if(abs(q.x)>5.||q.y<-.8||q.y>5.5)return;
- float d=type<.5?pineShape(q):type<1.5?boatShape(q):type<2.5?pavilionShape(q):birdShape(q,elapsed*2.2+anchor.z);
+ float d=type<.5?pineShape(q):birdShape(q,elapsed*2.2+anchor.z);
  float aa=max(.012,t/resolution.y/size);
  float alpha=(1.-smoothstep(-aa,aa,d))*smoothstep(1.,5.,t);
  if(alpha<.005)return;
@@ -177,6 +180,7 @@ void paintObject(inout vec3 color,inout float depth,vec3 ro,vec3 rd,vec3 anchor,
  color=mix(color,ink,alpha);
  if(alpha>.5)depth=t;
 }
+${solidLandmarksGLSL}
 vec3 addLandmarks(vec3 color,vec3 ro,vec3 rd,float terrainDepth){
  float depth=terrainDepth;
  float first=floor(position/180.);
@@ -192,11 +196,16 @@ vec3 addLandmarks(vec3 color,vec3 ro,vec3 rd,float terrainDepth){
   if(landmarks.y>.5){
    float bz=id*180.+95.+hash(vec2(id,81.))*25.;
    float bx=river(bz)-side*(4.+hash(vec2(id,9.))*4.);
-   paintObject(color,depth,ro,rd,vec3(bx,.22,bz),1.2,1.,side);
+   float variant=floor(hash(vec2(id,122.))*3.);
+   float size=.85+hash(vec2(id,124.))*.40;
+   float yaw=.25+hash(vec2(id,126.))*2.4;
+   paintSolid(color,depth,ro,rd,vec3(bx,.38,bz),size,yaw,0.,variant);
   }
   if(landmarks.z>.5){
-   float pz=id*180.+132.;float px=river(pz)-side*(riverWidth(pz)+18.);
-   paintObject(color,depth,ro,rd,vec3(px,max(.1,height(vec2(px,pz))),pz),1.65,2.,side);
+   vec3 site=pavilionAnchor(id);
+   float size=1.+hash(vec2(id,134.))*.22;
+   float yaw=.25+hash(vec2(id,136.))*.9;
+   paintSolid(color,depth,ro,rd,site+vec3(0,.04,0),size,yaw,1.,0.);
   }
   if(landmarks.w>.5&&i<2){
    float bz=id*180.+140.;
@@ -211,12 +220,13 @@ vec3 addLandmarks(vec3 color,vec3 ro,vec3 rd,float terrainDepth){
 }
 void main(){
  vec2 uv=(gl_FragCoord.xy*2.-resolution)/resolution.y;
- vec3 ro=vec3(river(position),8.,position);
- vec3 rd=normalize(vec3(uv.x,uv.y*.83-.035,1.35));
+ vec3 ro=vec3(river(position),camera.x,position);
+ float pitch=radians(camera.y),vy=uv.y*.83;
+ vec3 rd=normalize(vec3(uv.x,vy*cos(pitch)+1.35*sin(pitch),1.35*cos(pitch)-vy*sin(pitch)));
  float wt=rd.y<-.001?-ro.y/rd.y:650.;
  float t=marchTerrain(ro,rd,min(wt,650.));
  vec3 col=t>0.?mountain(ro+rd*t,rd,t):(wt<650.?water(ro,rd,wt):sky(rd));
- col=addLandmarks(col,ro,rd,t>0.?t:650.);
+ col=addLandmarks(col,ro,rd,t>0.?t:min(wt,650.));
  // Subtle fixed paper fibres, never animated film noise.
  float fibre=noise(gl_FragCoord.xy*vec2(.7,.45));
  float dust=hash(gl_FragCoord.xy);
@@ -226,8 +236,24 @@ void main(){
 }`;
 const canvas=$('landscape');const gl=canvas.getContext('webgl',{alpha:false,antialias:false,powerPreference:'high-performance'});let program,uniforms,failed=false;
 function fail(error){failed=true;$('error').hidden=false;for(const el of document.querySelectorAll('.console button,.console input'))el.disabled=true;console.error(error);}
-if(!gl)fail('WebGL unavailable');else try{function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const a=gl.getAttribLocation(program,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);uniforms={resolution:gl.getUniformLocation(program,'resolution'),position:gl.getUniformLocation(program,'position'),seed:gl.getUniformLocation(program,'seed'),style:gl.getUniformLocation(program,'style'),elapsed:gl.getUniformLocation(program,'elapsed'),landmarks:gl.getUniformLocation(program,'landmarks'),atmosphere:gl.getUniformLocation(program,'atmosphere')};}catch(e){fail(e);}
+if(!gl)fail('WebGL unavailable');else try{function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const a=gl.getAttribLocation(program,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);uniforms={resolution:gl.getUniformLocation(program,'resolution'),position:gl.getUniformLocation(program,'position'),seed:gl.getUniformLocation(program,'seed'),style:gl.getUniformLocation(program,'style'),elapsed:gl.getUniformLocation(program,'elapsed'),landmarks:gl.getUniformLocation(program,'landmarks'),atmosphere:gl.getUniformLocation(program,'atmosphere'),camera:gl.getUniformLocation(program,'camera')};}catch(e){fail(e);}
 let dirty=true;function resize(){const scale=Math.min(1,1100/innerWidth,750/innerHeight);canvas.width=Math.round(innerWidth*scale);canvas.height=Math.round(innerHeight*scale);dirty=true;}addEventListener('resize',resize);resize();
+function validateCamera(values){
+ if(values.cameraHeight!==undefined&&(!Number.isFinite(values.cameraHeight)||values.cameraHeight<3||values.cameraHeight>80))throw Error('观察高度应为 3–80 米');
+ if(values.pitch!==undefined&&(!Number.isFinite(values.pitch)||values.pitch< -55||values.pitch>30))throw Error('视角应为俯视 55° 到仰视 30°');
+}
+function setCamera(values){
+ validateCamera(values);
+ if(values.cameraHeight!==undefined)state.cameraHeight=values.cameraHeight;
+ if(values.pitch!==undefined)state.pitch=values.pitch;
+ $('camera-height').value=String(state.cameraHeight);$('camera-pitch').value=String(state.pitch);
+ $('camera-height-value').textContent=state.cameraHeight+' 米';
+ $('camera-pitch-value').textContent=state.pitch===0?'平视':(state.pitch<0?'俯视 ':'仰视 ')+Math.abs(state.pitch)+'°';
+ dirty=true;
+}
+$('camera-height').addEventListener('input',()=>setCamera({cameraHeight:Number($('camera-height').value)}));
+$('camera-pitch').addEventListener('input',()=>setCamera({pitch:Number($('camera-pitch').value)}));
+$('reset-camera').addEventListener('click',()=>{setCamera({cameraHeight:16,pitch:-8});$('announce').textContent='已恢复默认视角，行程保持不变';});
 const featureNames={pine:'临水松树',boat:'水上小舟',pavilion:'山间亭子',birds:'远处飞鸟',fog:'流动雾气',ripples:'水面微澜',openings:'山峡开合'};
 function setFeatures(values){
  if(!values||typeof values!=='object'||Array.isArray(values)||Object.entries(values).some(([key,value])=>!Object.hasOwn(features,key)||typeof value!=='boolean'))throw Error('无效景致设置');
@@ -271,7 +297,7 @@ function frame(now){
   if(features.birds||features.fog||features.ripples){sceneTime+=dt;if(now-lastAmbientRender>33){dirty=true;lastAmbientRender=now;}}
   if(dirty){
    gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);
-   gl.uniform1f(uniforms.position,state.position);gl.uniform1f(uniforms.seed,hashSeed(state.seed));gl.uniform1f(uniforms.style,state.style);
+   gl.uniform2f(uniforms.camera,state.cameraHeight,state.pitch);gl.uniform1f(uniforms.position,state.position);gl.uniform1f(uniforms.seed,hashSeed(state.seed));gl.uniform1f(uniforms.style,state.style);
    gl.uniform1f(uniforms.elapsed,sceneTime);gl.uniform4f(uniforms.landmarks,Number(features.pine),Number(features.boat),Number(features.pavilion),Number(features.birds));
    gl.uniform3f(uniforms.atmosphere,Number(features.fog),Number(features.ripples),Number(features.openings));
    gl.drawArrays(gl.TRIANGLES,0,6);dirty=false;
@@ -284,17 +310,17 @@ if(document.modelContext?.registerTool){
  const featureSchema={type:'object',properties:Object.fromEntries(Object.keys(features).map(key=>[key,{type:'boolean',description:featureNames[key]}])),additionalProperties:false};
  try{Promise.resolve(document.modelContext.registerTool({
   name:'configure_shanshui_journey',
-  description:'设置画风、种子、游览速度或独立景致开关。更换种子回到起点；画风及景致开关保留行程。',
-  inputSchema:{type:'object',properties:{style:{type:'integer',minimum:0,maximum:3,description:'0 宋画水墨，1 宣纸写意，2 青绿山水，3 雨雾实景'},seed:{type:'string',minLength:1,maxLength:64},speed:{type:'number',minimum:.25,maximum:3},auto:{type:'boolean'},features:featureSchema},additionalProperties:false},
+  description:'设置观察高度、俯仰、画风、种子、游览速度或景致。更换种子回到起点；其他设置保留行程。',
+  inputSchema:{type:'object',properties:{cameraHeight:{type:'number',minimum:3,maximum:80,description:'观察高度，米'},pitch:{type:'number',minimum:-55,maximum:30,description:'上下视角，负数俯视、正数仰视'},style:{type:'integer',minimum:0,maximum:3,description:'0 宋画水墨，1 宣纸写意，2 青绿山水，3 雨雾实景'},seed:{type:'string',minLength:1,maxLength:64},speed:{type:'number',minimum:.25,maximum:3},auto:{type:'boolean'},features:featureSchema},additionalProperties:false},
   annotations:{readOnlyHint:false,untrustedContentHint:false},
   execute(input){
-   if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['seed','speed','auto','style','features'].includes(k)))throw Error('无效参数');
-   if(input.style!==undefined&&(!Number.isInteger(input.style)||input.style<0||input.style>3))throw Error('无效画风');
+   if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['seed','speed','auto','style','features','cameraHeight','pitch'].includes(k)))throw Error('无效参数');
+   validateCamera(input);if(input.style!==undefined&&(!Number.isInteger(input.style)||input.style<0||input.style>3))throw Error('无效画风');
    if(input.seed!==undefined&&(typeof input.seed!=='string'||!input.seed.trim()||input.seed.length>64))throw Error('无效种子');
    if(input.speed!==undefined&&(typeof input.speed!=='number'||!Number.isFinite(input.speed)||input.speed<.25||input.speed>3))throw Error('无效速度');
    if(input.auto!==undefined&&typeof input.auto!=='boolean')throw Error('无效自动前进设置');
    if(input.features!==undefined&&(!input.features||typeof input.features!=='object'||Array.isArray(input.features)||Object.entries(input.features).some(([key,value])=>!Object.hasOwn(features,key)||typeof value!=='boolean')))throw Error('无效景致设置');
-   if(input.style!==undefined)setStyle(input.style);
+   setCamera(input);if(input.style!==undefined)setStyle(input.style);
    if(input.seed!==undefined)generate(input.seed);
    if(input.features!==undefined)setFeatures(input.features);
    if(input.speed!==undefined){state.speed=input.speed;$('speed').value=String(input.speed);}
