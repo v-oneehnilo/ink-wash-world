@@ -27,8 +27,8 @@ const translations = {
  '已切换为纯山水':'Landscape-only mode enabled','已加入全部景致':'All scenery enabled',
  '已切换为':'Style changed to: ','已加入':' enabled','已关闭':' disabled','新的山水已生成':'New landscape generated','请输入数字或文字':'Enter numbers or text'
 };
-let language = 'zh';
-try { if (localStorage.getItem('ink-language') === 'en') language = 'en'; } catch {}
+let language = 'en';
+try { if (localStorage.getItem('ink-language-choice') === 'zh') language = 'zh'; } catch {}
 function t(text) { return language === 'en' ? (translations[text] ?? text) : text; }
 (() => {
  const nodes = [];
@@ -61,7 +61,7 @@ function t(text) { return language === 'en' ? (translations[text] ?? text) : tex
    document.getElementById('style-label').textContent=t(paintStyles[state.style].name);
   }
   document.getElementById('announce').textContent='';
-  try { localStorage.setItem('ink-language',value); } catch {}
+  try { localStorage.setItem('ink-language-choice',value); } catch {}
  }
  document.querySelectorAll('[data-language]').forEach(button=>button.addEventListener('click',()=>applyLanguage(button.dataset.language)));
  applyLanguage(language);
