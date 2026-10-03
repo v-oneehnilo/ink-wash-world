@@ -10,7 +10,7 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 root = Path(__file__).resolve().parent.parent
-corpus = ''.join((root / path).read_text(encoding='utf-8-sig') for path in ['dist/index.html','dist/app.js'])
+corpus = ''.join((root / path).read_text(encoding='utf-8-sig') for path in ['dist/index.html','dist/app.js','dist/i18n.js'])
 corpus += ''.join(chr(code) for code in range(32,127))
 for source, output, family, weight, text in [
     ('NotoSansSC-VF.ttf','ink-ui.woff2','Ink UI',(400,650),corpus),
