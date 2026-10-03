@@ -7,12 +7,12 @@
 <link rel="preload" href="fonts/ink-ui.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="style.css">
 </head>
 <body data-style="0">
-<canvas id="landscape" aria-label="可游览的山水。左侧操控台可调整视角、画风和点景，也可使用上下方向键前后移动。"></canvas><div class="vignette"></div>
-<header class="site-header"><div class="wordmark"><span class="seal" aria-hidden="true">自在</span><span>山水无限</span></div><p class="top-note">一水行舟 · 万山入画</p></header>
+<canvas id="landscape" aria-label="可游览的山水。左侧更改可调整视角、画风和点景，也可使用上下方向键前后移动。"></canvas><div class="vignette"></div>
+<header class="site-header"><div class="wordmark"><span class="seal" aria-hidden="true">自在</span><span>山水无限</span></div><div class="header-tools"><p class="top-note">一水行舟 · 万山入画</p><div class="language-picker" role="group" aria-label="Language / 语言"><button type="button" data-language="zh" lang="zh-CN" aria-pressed="true">中文</button><span aria-hidden="true">/</span><button type="button" data-language="en" lang="en" aria-pressed="false">EN</button></div></div></header>
 <main><div id="error" role="alert" hidden>当前浏览器无法显示山水。请启用硬件加速，或使用支持 WebGL 的浏览器重新打开。</div></main>
-<aside class="console" id="console" aria-label="游览操控台">
- <div class="panel-heading"><h1>操控台</h1><button id="hide" class="icon-button" aria-label="关闭操控台" title="关闭操控台"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
- <div class="panel-tabs" role="tablist" aria-label="操控台设置">
+<aside class="console" id="console" aria-label="游览更改">
+ <div class="panel-heading"><h1>更改</h1><button id="hide" class="icon-button" aria-label="关闭更改" title="关闭更改"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+ <div class="panel-tabs" role="tablist" aria-label="更改设置">
   <button id="tab-explore" role="tab" aria-selected="true" aria-controls="panel-explore" data-tab="explore">游览</button>
   <button id="tab-appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" tabindex="-1" data-tab="appearance">画面</button>
   <button id="tab-scenery" role="tab" aria-selected="false" aria-controls="panel-scenery" tabindex="-1" data-tab="scenery">点景</button>
@@ -54,7 +54,7 @@
   </section>
  </div>
 </aside>
-<button id="show" class="show-console" aria-controls="console" aria-expanded="true" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg><span>操控台</span></button>
+<button id="show" class="show-console" aria-controls="console" aria-expanded="true" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg><span>更改</span></button>
 <footer class="journey" aria-label="当前游览状态"><span id="style-label">宋画水墨</span><span class="divider" aria-hidden="true"></span><span id="status">静观山水</span><span class="divider" aria-hidden="true"></span><span class="distance-label">行程 <b id="distance">0</b> 米</span></footer>
-<div id="announce" class="sr-only" role="status" aria-live="polite"></div><script src="solids.js"></script><script src="app.js"></script>
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div><script src="solids.js"></script><script src="i18n.js"></script><script src="app.js"></script>
 </body></html>

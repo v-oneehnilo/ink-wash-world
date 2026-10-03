@@ -247,13 +247,13 @@ function setCamera(values){
  if(values.cameraHeight!==undefined)state.cameraHeight=values.cameraHeight;
  if(values.pitch!==undefined)state.pitch=values.pitch;
  $('camera-height').value=String(state.cameraHeight);$('camera-pitch').value=String(state.pitch);
- $('camera-height-value').textContent=state.cameraHeight+' 米';
- $('camera-pitch-value').textContent=state.pitch===0?'平视':(state.pitch<0?'俯视 ':'仰视 ')+Math.abs(state.pitch)+'°';
+ $('camera-height-value').textContent=state.cameraHeight+' '+t('米');
+ $('camera-pitch-value').textContent=state.pitch===0?t('平视'):t(state.pitch<0?'俯视 ':'仰视 ')+Math.abs(state.pitch)+'°';
  dirty=true;
 }
 $('camera-height').addEventListener('input',()=>setCamera({cameraHeight:Number($('camera-height').value)}));
 $('camera-pitch').addEventListener('input',()=>setCamera({pitch:Number($('camera-pitch').value)}));
-$('reset-camera').addEventListener('click',()=>{setCamera({cameraHeight:16,pitch:-8});$('announce').textContent='已恢复默认视角，行程保持不变';});
+$('reset-camera').addEventListener('click',()=>{setCamera({cameraHeight:16,pitch:-8});$('announce').textContent=t('已恢复默认视角，行程保持不变');});
 const featureNames={pine:'临水松树',boat:'水上小舟',pavilion:'山间亭子',birds:'远处飞鸟',fog:'流动雾气',ripples:'水面微澜',openings:'山峡开合'};
 function setFeatures(values){
  if(!values||typeof values!=='object'||Array.isArray(values)||Object.entries(values).some(([key,value])=>!Object.hasOwn(features,key)||typeof value!=='boolean'))throw Error('无效景致设置');
@@ -261,9 +261,9 @@ function setFeatures(values){
  for(const input of document.querySelectorAll('[data-feature]'))input.checked=features[input.dataset.feature];
  dirty=true;
 }
-for(const input of document.querySelectorAll('[data-feature]'))input.addEventListener('change',()=>{setFeatures({[input.dataset.feature]:input.checked});$('announce').textContent=featureNames[input.dataset.feature]+(input.checked?'已加入':'已关闭');});
-$('pure').addEventListener('click',()=>{setFeatures(Object.fromEntries(Object.keys(features).map(key=>[key,false])));$('announce').textContent='已切换为纯山水';});
-$('all-scenery').addEventListener('click',()=>{setFeatures(Object.fromEntries(Object.keys(features).map(key=>[key,true])));$('announce').textContent='已加入全部景致';});
+for(const input of document.querySelectorAll('[data-feature]'))input.addEventListener('change',()=>{setFeatures({[input.dataset.feature]:input.checked});$('announce').textContent=t(featureNames[input.dataset.feature])+t(input.checked?'已加入':'已关闭');});
+$('pure').addEventListener('click',()=>{setFeatures(Object.fromEntries(Object.keys(features).map(key=>[key,false])));$('announce').textContent=t('已切换为纯山水');});
+$('all-scenery').addEventListener('click',()=>{setFeatures(Object.fromEntries(Object.keys(features).map(key=>[key,true])));$('announce').textContent=t('已加入全部景致');});
 setFeatures(features);
 const paintStyles=[
  {name:'宋画水墨',note:'淡设色，细皴笔。近山有骨，远山入烟。'},
@@ -275,8 +275,8 @@ function setStyle(value){
  if(!Number.isInteger(value)||value<0||value>=paintStyles.length)throw Error('无效画风');
  state.style=value;document.body.dataset.style=String(value);
  for(const button of document.querySelectorAll('[data-paint]'))button.setAttribute('aria-pressed',String(Number(button.dataset.paint)===value));
- $('style-note').textContent=paintStyles[value].note;$('style-label').textContent=paintStyles[value].name;
- $('announce').textContent='已切换为'+paintStyles[value].name;dirty=true;
+ $('style-note').textContent=t(paintStyles[value].note);$('style-label').textContent=t(paintStyles[value].name);
+ $('announce').textContent=t('已切换为')+t(paintStyles[value].name);dirty=true;
 }
 for(const button of document.querySelectorAll('[data-paint]'))button.addEventListener('click',()=>setStyle(Number(button.dataset.paint)));
 function setDrawer(open){$('console').hidden=!open;$('show').hidden=open;$('show').setAttribute('aria-expanded',String(open));(open?$('hide'):$('show')).focus();}
@@ -301,10 +301,10 @@ panelTabs.forEach((tab,index)=>{
  });
 });
 addEventListener('keydown',event=>{if(event.code==='Escape'&&!$('console').hidden)setDrawer(false);});
-function updateUI(){const direction=state.manual||(state.auto?1:0);$('auto').setAttribute('aria-pressed',String(state.auto));$('auto-text').textContent=state.auto?'暂停游览':'自动前进';$('auto-symbol').textContent=state.auto?'Ⅱ':'▷';$('status').textContent=direction<0?'归舟回望':direction>0?'行舟山水':'静观山水';$('distance').textContent=Math.floor(state.position);$('back').disabled=state.position<=0;$('speed-value').textContent=state.speed.toFixed(2)+'×';$('forward').classList.toggle('active',state.manual===1);$('back').classList.toggle('active',state.manual===-1);}
+function updateUI(){const direction=state.manual||(state.auto?1:0);$('auto').setAttribute('aria-pressed',String(state.auto));$('auto-text').textContent=t(state.auto?'暂停游览':'自动前进');$('auto-symbol').textContent=state.auto?'Ⅱ':'▷';$('status').textContent=t(direction<0?'归舟回望':direction>0?'行舟山水':'静观山水');$('distance').textContent=Math.floor(state.position);$('back').disabled=state.position<=0;$('speed-value').textContent=state.speed.toFixed(2)+'×';$('forward').classList.toggle('active',state.manual===1);$('back').classList.toggle('active',state.manual===-1);}
 function stop(){state.manual=0;updateUI();}function toggleAuto(){state.manual=0;state.auto=!state.auto;updateUI();}
-function generate(value){if(typeof value!=='string'||!value.trim()||value.length>64)throw Error('请输入 1–64 个字符的种子');state.seed=value.trim();state.position=0;state.auto=false;state.manual=0;$('seed').value=state.seed;dirty=true;updateUI();$('announce').textContent='新的山水已生成';}
-$('seed-form').addEventListener('submit',e=>{e.preventDefault();if(!$('seed').value.trim()){$('seed').setCustomValidity('请输入数字或文字');$('seed').reportValidity();return;}generate($('seed').value);});$('seed').addEventListener('input',()=>$('seed').setCustomValidity(''));
+function generate(value){if(typeof value!=='string'||!value.trim()||value.length>64)throw Error('请输入 1–64 个字符的种子');state.seed=value.trim();state.position=0;state.auto=false;state.manual=0;$('seed').value=state.seed;dirty=true;updateUI();$('announce').textContent=t('新的山水已生成');}
+$('seed-form').addEventListener('submit',e=>{e.preventDefault();if(!$('seed').value.trim()){$('seed').setCustomValidity(t('请输入数字或文字'));$('seed').reportValidity();return;}generate($('seed').value);});$('seed').addEventListener('input',()=>$('seed').setCustomValidity(''));
 for(const [id,dir] of [['forward',1],['back',-1]]){const b=$(id);b.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();b.setPointerCapture(e.pointerId);state.auto=false;state.manual=dir;updateUI();});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,stop);b.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();state.auto=false;state.manual=dir;updateUI();}});b.addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();stop();}});b.addEventListener('blur',stop);}
 $('auto').addEventListener('click',toggleAuto);$('speed').addEventListener('input',()=>{state.speed=Number($('speed').value);updateUI();});$('reset').addEventListener('click',()=>{state.position=0;state.auto=false;state.manual=0;dirty=true;updateUI();});$('hide').addEventListener('click',()=>setDrawer(false));$('show').addEventListener('click',()=>setDrawer(true));
 addEventListener('keydown',e=>{if(/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName))return;if(['ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)toggleAuto();if(e.code==='ArrowUp'||e.code==='ArrowDown'){state.auto=false;state.manual=e.code==='ArrowUp'?1:-1;updateUI();}});addEventListener('keyup',e=>{if(e.code==='ArrowUp'||e.code==='ArrowDown')stop();});addEventListener('blur',()=>{state.manual=0;state.auto=false;updateUI();});document.addEventListener('visibilitychange',()=>{if(document.hidden){state.manual=0;state.auto=false;updateUI();}});canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();state.auto=false;fail('画面连接中断，请刷新页面');});
