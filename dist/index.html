@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f7f2">
 <meta name="description" content="在层叠山水之间，自由前行。以一枚种子，开启一段无限旅程。"><title>山水无限 · 自在游</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b4849'/%3E%3Cpath d='M4 24L12 9l6 10 4-7 7 12' fill='none' stroke='%23edf1e8' stroke-width='2'/%3E%3C/svg%3E">
-<link rel="preload" href="fonts/ink-ui.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="style.css">
+<link rel="preload" href="fonts/ink-ui.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="style.css?v=controls-2">
 </head>
 <body data-style="0">
 <canvas id="landscape" aria-label="可游览的山水。左侧更改可调整视角、画风和点景，也可使用上下方向键前后移动。"></canvas><div class="vignette"></div>
@@ -20,7 +20,7 @@
  <div class="panel-body">
   <section id="panel-explore" class="tab-panel" role="tabpanel" aria-labelledby="tab-explore" tabindex="0">
    <section class="control-section" aria-labelledby="travel-title"><h2 id="travel-title">行进</h2>
-    <div class="travel-controls"><button id="back" class="travel" aria-label="按住后退">后退</button><button id="forward" class="travel" aria-label="按住前进">前进</button><button id="auto" class="auto" aria-pressed="false"><span id="auto-symbol" aria-hidden="true">▷</span><span id="auto-text">自动前进</span></button></div>
+    <div class="travel-controls"><button id="back" class="travel" aria-label="按住后退">后退</button><button id="auto" class="auto" aria-pressed="false"><span id="auto-symbol" aria-hidden="true">▷</span><span id="auto-text">自动前进</span></button></div>
     <p class="hint">按住前后移动，松开即停。</p>
     <div class="slider-field speed-row"><label for="speed">行进速度</label><output id="speed-value" for="speed">1.00×</output><input id="speed" type="range" min="0.25" max="3" step="0.25" value="1"></div>
    </section>
@@ -55,6 +55,7 @@
  </div>
 </aside>
 <button id="show" class="show-console" aria-controls="console" aria-expanded="true" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg><span>更改</span></button>
+<button id="forward" class="travel forward-floating" aria-label="按住前进" title="按住前进"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20V4m-6 6 6-6 6 6"/></svg><span>前进</span></button>
 <footer class="journey" aria-label="当前游览状态"><span id="style-label">宋画水墨</span><span class="divider" aria-hidden="true"></span><span id="status">静观山水</span><span class="divider" aria-hidden="true"></span><span class="distance-label">行程 <b id="distance">0</b> 米</span></footer>
-<div id="announce" class="sr-only" role="status" aria-live="polite"></div><script src="solids.js"></script><script src="i18n.js"></script><script src="app.js"></script>
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div><script src="solids.js?v=controls-2"></script><script src="i18n.js?v=controls-2"></script><script src="app.js?v=controls-2"></script>
 </body></html>

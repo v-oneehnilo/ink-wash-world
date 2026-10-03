@@ -30,7 +30,7 @@ const translations = {
 let language = 'zh';
 try { if (localStorage.getItem('ink-language') === 'en') language = 'en'; } catch {}
 function t(text) { return language === 'en' ? (translations[text] ?? text) : text; }
-document.addEventListener('DOMContentLoaded', () => {
+(() => {
  const nodes = [];
  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
  while (walker.nextNode()) {
@@ -53,13 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const {node,source,raw} of nodes) node.textContent = raw.replace(source,t(source));
   for (const {node,name,source} of attributes) node.setAttribute(name,t(source));
   for (const button of document.querySelectorAll('[data-language]')) button.setAttribute('aria-pressed',String(button.dataset.language === value));
-  $('seed').setCustomValidity('');
-  updateUI(); setCamera({});
-  $('style-note').textContent=t(paintStyles[state.style].note);
-  $('style-label').textContent=t(paintStyles[state.style].name);
-  $('announce').textContent='';
+  document.getElementById('seed').setCustomValidity('');
+  if (typeof updateUI === 'function') updateUI();
+  if (typeof setCamera === 'function') setCamera({});
+  if (typeof paintStyles !== 'undefined') {
+   document.getElementById('style-note').textContent=t(paintStyles[state.style].note);
+   document.getElementById('style-label').textContent=t(paintStyles[state.style].name);
+  }
+  document.getElementById('announce').textContent='';
   try { localStorage.setItem('ink-language',value); } catch {}
  }
  document.querySelectorAll('[data-language]').forEach(button=>button.addEventListener('click',()=>applyLanguage(button.dataset.language)));
  applyLanguage(language);
-});
+ document.addEventListener('DOMContentLoaded',()=>applyLanguage(language),{once:true});
+})();

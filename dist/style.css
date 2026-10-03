@@ -70,3 +70,9 @@ button:disabled{color:#a29986;background:#e9e1d240;border-color:#d9cfba}
 html[lang=en] .panel-heading h1,html[lang=en] .panel-tabs button,html[lang=en] h2,html[lang=en] .field-title,html[lang=en] .travel,html[lang=en] .auto,html[lang=en] .secondary-button{letter-spacing:.02em}
 html[lang=en] .wordmark{font-size:1.2rem;letter-spacing:.02em}html[lang=en] .scenery-options label{gap:8px}
 @media(max-width:600px){.site-header{gap:8px}.header-tools{gap:0}html[lang=en] .wordmark{font-size:clamp(13px,3.8vw,18px);gap:6px}.language-picker{gap:0}.language-picker button{min-width:36px;padding:4px}.wordmark{gap:8px}}
+.site-header{z-index:5}.language-picker,.language-picker button{pointer-events:auto}
+.travel-controls{grid-template-columns:1fr}
+.forward-floating{position:fixed;right:24px;bottom:22px;z-index:4;display:flex;align-items:center;justify-content:center;gap:8px;min-width:104px;min-height:48px;background:#f4efe2f5;border-color:#96836b;box-shadow:0 3px 18px #302b201c;touch-action:none;user-select:none;-webkit-user-select:none}
+.forward-floating.active{background:#45483e;color:#fff5df;border-color:#45483e}
+@media(max-width:800px){.journey{left:16px;transform:none;max-width:calc(100vw - 152px);width:max-content;gap:5px;padding:6px 8px;bottom:18px}.forward-floating{right:16px;bottom:18px;min-width:112px}.console{height:calc(100dvh - 112px - 6rem)}}
+@media(max-height:620px){.console{height:calc(100dvh - 89px - 6rem)}}
