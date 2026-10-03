@@ -14,7 +14,7 @@ corpus = ''.join((root / path).read_text(encoding='utf-8-sig') for path in ['dis
 corpus += ''.join(chr(code) for code in range(32,127))
 for source, output, family, weight, text in [
     ('NotoSansSC-VF.ttf','ink-ui.woff2','Ink UI',(400,650),corpus),
-    ('NotoSerifSC-VF.ttf','ink-display.woff2','Ink Display',500,'山水无限自在'),
+    ('NotoSerifSC-VF.ttf','ink-display.woff2','Ink Display',(400,650),corpus),
 ]:
     font = TTFont(Path(sys.argv[1]) / source)
     options = subset.Options()
